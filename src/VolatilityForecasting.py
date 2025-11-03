@@ -62,40 +62,38 @@ class VolConfig:
 def fetch_prices(tickers, start, end, price_col="Adj Close", save_dir=None):
     import os
     os.makedirs(save_dir, exist_ok=True)
-
     all_prices = pd.DataFrame()
 
     for ticker in tickers:
         file_path = os.path.join(save_dir, f"{ticker}.csv")
 
-        # 1. Load from cache or download
+        #  Load from cache or download
         if os.path.exists(file_path):
             logging.info(f"[{ticker}] Loading cached data from {file_path}")
-            df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+            # Read MultiIndex header (2 rows)
+            df = pd.read_csv(file_path, header=[0, 1], index_col=0)
         else:
             logging.info(f"[{ticker}] Downloading new data from Yahoo Finance...")
             df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False)
             df.to_csv(file_path)
             logging.info(f"[{ticker}] Saved raw data to {file_path}")
 
-        # 2. Handle column structure (MultiIndex or single)
+        #  Convert index to datetime safely
+        df.index = pd.to_datetime(df.index, errors="coerce")
+
+        # 3️⃣ Handle yfinance MultiIndex format
         if isinstance(df.columns, pd.MultiIndex):
+            # Select 'Adj Close' for that ticker
             df = df.xs(price_col, axis=1, level=0)
-        if isinstance(df, pd.DataFrame) and df.shape[1] == 1:
             df.columns = [ticker]
-        elif isinstance(df, pd.Series):
-            df = df.to_frame(name=ticker)
         elif price_col in df.columns:
             df = df[[price_col]].rename(columns={price_col: ticker})
         else:
             raise ValueError(f"{price_col} not found in {ticker} data")
 
-        # 3. Clean numeric data
+        # 4️ Clean and append
         df[ticker] = pd.to_numeric(df[ticker], errors="coerce")
-        df = df.dropna(subset=[ticker])
-        df = df.sort_index()
-
-        # 4. Append to main frame
+        df = df.dropna(subset=[ticker]).sort_index()
         all_prices = pd.concat([all_prices, df], axis=1)
 
     return all_prices.dropna(how="all")
@@ -341,7 +339,10 @@ def oos_dynamic_vol(
     min_obs: int = 400,
     verbose: bool = False,
 ) -> pd.Series:
+    # Ensure datetime index for comparison
     r_pct_full = (100 * returns.dropna()).copy()
+    r_pct_full.index = pd.to_datetime(r_pct_full.index)  # <-- ADD THIS LINE ✅
+
     out = {}
     for i, d in enumerate(pd.to_datetime(target_dates)):
         ins = r_pct_full[r_pct_full.index < d]
@@ -355,6 +356,7 @@ def oos_dynamic_vol(
         out[d] = (np.sqrt(var_next_pct2) / 100.0) * np.sqrt(cfg.annualization)
         if verbose and (i + 1) % 50 == 0:
             print(f"[GARCH OOS] {i+1}/{len(target_dates)} processed")
+
     return pd.Series(out, name="garch_oos_vol_annual").sort_index()
 
 def dm_test(y_true: pd.Series,
