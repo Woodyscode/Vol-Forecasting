@@ -1,0 +1,22 @@
+﻿# ---- Python Environment ----
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ---- Output Files ----
+*.csv
+*.xlsx
+*.parquet
+*.json
+*.log
+
+# ---- IDE & System ----
+.vscode/
+.DS_Store
+*.tmp
+*.bak
+
+# ---- Optional: Jupyter Cache ----
+.ipynb_checkpoints/
