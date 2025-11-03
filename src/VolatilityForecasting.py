@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import warnings; warnings.filterwarnings("ignore")
-
+import os
 import math
 from dataclasses import dataclass
 from typing import List, Dict, Tuple
@@ -35,6 +35,7 @@ class VolConfig:
     start: str = "2018-01-01"
     end: str = None
     price_col: str = "Adj Close"
+    data_dir: str = "data/raw"
     h_forecast: int = 5
     annualization: int = 252
     dist: str = "t"
@@ -58,16 +59,46 @@ class VolConfig:
 
 
 # -------- Data utils --------
-def fetch_prices(tickers, start, end, price_col="Adj Close"):
-    data = yf.download(tickers, start=start, end=end, auto_adjust=False, progress=False)
-    if isinstance(data.columns, pd.MultiIndex):
-        prices = data.xs(price_col, axis=1, level=0).reindex(columns=tickers)
-    else:
-        if price_col not in data.columns:
-            raise ValueError(f"{price_col} not found in downloaded columns")
-        prices = data[[price_col]].copy()
-        prices.columns = [tickers[0]]
-    return prices.dropna(how="all")
+def fetch_prices(tickers, start, end, price_col="Adj Close", save_dir=None):
+    import os
+    os.makedirs(save_dir, exist_ok=True)
+
+    all_prices = pd.DataFrame()
+
+    for ticker in tickers:
+        file_path = os.path.join(save_dir, f"{ticker}.csv")
+
+        # 1. Load from cache or download
+        if os.path.exists(file_path):
+            logging.info(f"[{ticker}] Loading cached data from {file_path}")
+            df = pd.read_csv(file_path, index_col=0, parse_dates=True)
+        else:
+            logging.info(f"[{ticker}] Downloading new data from Yahoo Finance...")
+            df = yf.download(ticker, start=start, end=end, auto_adjust=False, progress=False)
+            df.to_csv(file_path)
+            logging.info(f"[{ticker}] Saved raw data to {file_path}")
+
+        # 2. Handle column structure (MultiIndex or single)
+        if isinstance(df.columns, pd.MultiIndex):
+            df = df.xs(price_col, axis=1, level=0)
+        if isinstance(df, pd.DataFrame) and df.shape[1] == 1:
+            df.columns = [ticker]
+        elif isinstance(df, pd.Series):
+            df = df.to_frame(name=ticker)
+        elif price_col in df.columns:
+            df = df[[price_col]].rename(columns={price_col: ticker})
+        else:
+            raise ValueError(f"{price_col} not found in {ticker} data")
+
+        # 3. Clean numeric data
+        df[ticker] = pd.to_numeric(df[ticker], errors="coerce")
+        df = df.dropna(subset=[ticker])
+        df = df.sort_index()
+
+        # 4. Append to main frame
+        all_prices = pd.concat([all_prices, df], axis=1)
+
+    return all_prices.dropna(how="all")
 
 def to_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
     return np.log(prices / prices.shift(1)).dropna(how="all")
@@ -427,7 +458,7 @@ def har_rv_oos(rv: pd.Series,
 # -------- Pipeline --------
 def run_pipeline(cfg: VolConfig, verbose: bool = False) -> Dict[str, Dict[str, pd.Series | pd.DataFrame]]:
     logging.info(f"Starting pipeline for tickers: {cfg.tickers}")
-    prices = fetch_prices(cfg.tickers, cfg.start, cfg.end, cfg.price_col)
+    prices = fetch_prices(cfg.tickers, cfg.start, cfg.end, cfg.price_col, cfg.data_dir)
     rets   = to_log_returns(prices)
 
     rows: list[dict] = []
