@@ -1,353 +1,149 @@
-﻿# Volatility Forecasting (GARCH, HAR-RV, LSTM)
+# Volatility Forecasting (GARCH, HAR-RV, LSTM)
 
-This project compares econometric and deep learning approaches for forecasting financial market volatility.  
+This project compares **econometric** and **deep learning** approaches for forecasting financial market volatility.
+
 Implemented models:
 - **GARCH(1,1)**
 - **HAR-RV**
 - **LSTM (PyTorch, walk-forward retraining)**
 
-### 🧠 Features
+---
+
+###  Features
 - Yahoo Finance data ingestion via `yfinance`
 - Rolling realized volatility computation
 - Out-of-sample walk-forward validation
 - Diebold–Mariano statistical comparison
 - CSV outputs for reproducibility
 
-### 📊 Example Output
-Plots and metrics are saved for each ticker (AAPL, MSFT).  
-Models are compared via RMSE, MAE, MAPE, R², and Diebold–Mariano tests.
+---
 
-### 📁 File Structure
+###  Example Output
+Plots and metrics are saved for each ticker (AAPL, MSFT).  
+Models are compared via **RMSE**, **MAE**, **MAPE**, **R²**, and **Diebold–Mariano** tests.
+
+Below are sample volatility forecasts showing realized volatility versus GARCH and LSTM predictions.
+
+#### Apple (AAPL)
+![AAPL Volatility Forecast](images/Apple_Vol_Model_Comparison.png)
+
+#### Microsoft (MSFT)
+![MSFT Volatility Forecast](images/Microsoft_Vol_Model_Comparison.png)
+---
+
+###  File Structure
 VOL-FORECASTING/
 │
-├── VolatilityForecasting.py # Main pipeline
-├── vol_accuracy_comparison.csv # Model performance summary
-├── dm_tests.csv # Diebold–Mariano test results
-├── AAPL_vol_outputs.csv, MSFT_vol_outputs.csv
-├── AAPL_garch_params.csv, MSFT_garch_params.csv
-└── .gitignore
-### Requirements
+├── VolatilityForecasting.py          # Main pipeline
+│
+├── vol_accuracy_comparison.csv       # Model performance summary
+├── dm_tests.csv                      # Diebold–Mariano test results
+│
+├── AAPL_vol_outputs.csv              # AAPL volatility outputs
+├── MSFT_vol_outputs.csv              # MSFT volatility outputs
+│
+├── AAPL_garch_params.csv             # AAPL GARCH(1,1) parameters
+├── MSFT_garch_params.csv             # MSFT GARCH(1,1) parameters
+│
+├── images/
+│   ├── AAPL_vol_forecast.png         # AAPL realized vs forecasted volatility
+│   └── MSFT_vol_forecast.png         # MSFT realized vs forecasted volatility
+│
+├── .gitignore
+└── README.md
 
+###  Requirements
+- Python ≥ 3.9  
+- PyTorch  
+- ARCH  
+- scikit-learn  
+- yfinance  
+- matplotlib  
 
-Python ≥ 3.9
+---
 
-PyTorch
+##  Methodology Overview
 
-ARCH
-
-scikit-learn
-
-yfinance
-
-matplotlib
-
-### Methodology Overview
-
-1. GARCH(1,1) Model
-
+### 1. GARCH(1,1) Model
 The conditional variance evolves as:
 
-𝜎
-𝑡
-2
-=
-𝜔
-+
-𝛼
-𝜖
-𝑡
-−
-1
-2
-+
-𝛽
-𝜎
-𝑡
-−
-1
-2
-σ
-t
-2
-    ​
+**σₜ² = ω + αεₜ₋₁² + βσₜ₋₁²**
 
-=ω+αϵ
-t−1
-2
-    ​
+where:  
+- **σₜ²** — conditional variance (volatility²)  
+- **ω** — long-run mean variance  
+- **α** — reaction to recent shocks  
+- **β** — persistence of past volatility  
 
-+βσ
-t−1
-2
-    ​
+---
 
-
-where
-
-𝜎
-𝑡
-2
-σ
-t
-2
-    ​
-
-: conditional variance (volatility²)
-
-𝜔
-ω: long-run mean variance
-
-𝛼
-α: reaction to recent shocks
-
-𝛽
-β: persistence of past volatility
-
-
-2. HAR-RV Model
-
+### 2. HAR-RV Model
 The Heterogeneous AutoRegressive model for realized volatility:
 
-𝑅
-𝑉
-𝑡
-=
-𝛽
-0
-+
-𝛽
-1
-𝑅
-𝑉
-𝑡
-−
-1
-+
-𝛽
-2
-𝑅
-𝑉
-𝑡
-−
-5
-:
-𝑡
-−
-1
-‾
-+
-𝛽
-3
-𝑅
-𝑉
-𝑡
-−
-22
-:
-𝑡
-−
-1
-‾
-+
-𝜖
-𝑡
-RV
-t
-    ​
+**RVₜ = β₀ + β₁RVₜ₋₁ + β₂RV̄ₜ₋₅:ₜ₋₁ + β₃RV̄ₜ₋₂₂:ₜ₋₁ + εₜ**
 
-=β
-0
-    ​
+This model captures multi-horizon volatility components (daily, weekly, monthly).
 
-+β
-1
-    ​
+---
 
-RV
-t−1
-    ​
-
-+β
-2
-    ​
-
-RV
-t−5:t−1
-    ​
-
-    ​
-
-+β
-3
-    ​
-
-RV
-t−22:t−1
-    ​
-
-    ​
-
-+ϵ
-t
-    ​
-
-
-It captures multi-horizon volatility components (daily, weekly, monthly).
-
-
-
-3. LSTM Model
-
+### 3. LSTM Model
 A recurrent neural network using Long Short-Term Memory cells to capture nonlinear temporal dependencies in volatility:
 
-ℎ
-𝑡
-=
-LSTM
-(
-𝑅
-𝑉
-𝑡
-−
-1
-,
-𝑅
-𝑉
-𝑡
-−
-2
-,
-…
-,
-𝑅
-𝑉
-𝑡
-−
-𝑝
-)
-h
-t
-    ​
+**hₜ = LSTM(RVₜ₋₁, RVₜ₋₂, …, RVₜ₋ₚ)**
 
-=LSTM(RV
-t−1
-    ​
+Hidden states are trained via **Backpropagation Through Time (BPTT)**, and the model is **retrained in a walk-forward fashion** to simulate live forecasting conditions.
 
-,RV
-t−2
-    ​
+---
 
-,…,RV
-t−p
-    ​
+### 4. Diebold–Mariano Test
+Used to compare forecast accuracy between two models *A* and *B*:
 
-)
+**DM = 𝑑̄ / √((2π f̂_d(0)) / T)**  
 
-with hidden states trained via backpropagation through time (BPTT).
-The model is retrained in a walk-forward fashion to mimic live trading conditions.
+where:  
+- *dₜ = L(e<sub>A,t</sub>) − L(e<sub>B,t</sub>)*  
+- *L* is squared error loss  
 
-4. Diebold–Mariano Test
+A **negative DM statistic** implies Model A is more accurate.
 
-Used to compare forecast accuracy between two models 
-𝐴
-A and 
-𝐵
-B.
+---
 
-𝐷
-𝑀
-=
-𝑑
-ˉ
-2
-𝜋
-𝑓
-^
-𝑑
-(
-0
-)
-𝑇
-DM=
-T
-2π
-f
-^
-    ​
+##  Sample Results (2018–2025)
 
-d
-    ​
+| Ticker | Model | RMSE | MAE | MAPE (%) | R² |
+|:-------|:------|-----:|----:|---------:|----:|
+| **AAPL** | GARCH(1,1) (in-sample) | 0.0583 | 0.0438 | 17.88 | 0.81 |
+| **AAPL** | LSTM (WF) | 0.0345 | 0.0238 | 8.79 | 0.94 |
+| **AAPL** | HAR-RV (WF) | **0.0212** | **0.0113** | **4.12** | **0.98** |
+| **MSFT** | GARCH(1,1) (in-sample) | 0.0538 | 0.0398 | 17.34 | 0.82 |
+| **MSFT** | LSTM (WF) | 0.0344 | 0.0229 | 9.56 | 0.93 |
+| **MSFT** | HAR-RV (WF) | **0.0188** | **0.0102** | **4.01** | **0.98** |
 
-(0)
-    ​
+**Key Takeaway:**  
+Both **LSTM** and **HAR-RV** models achieve significant accuracy improvements over GARCH baselines — reducing RMSE by over **50%** and explaining **93–98%** of realized volatility variance.
 
-    ​
+---
 
-d
-ˉ
-    ​
+##  Diebold–Mariano Test Results (Forecast Accuracy Comparison)
 
+| Ticker | Comparison | DM Stat | p-value | Interpretation |
+|:-------|:------------|--------:|--------:|:----------------|
+| AAPL | LSTM WF vs GARCH OOS | -9.54 | < 0.001 | LSTM significantly outperforms GARCH |
+| AAPL | LSTM WF vs HAR-RV OOS | +12.13 | < 0.001 | HAR-RV significantly outperforms LSTM |
+| AAPL | HAR-RV OOS vs GARCH OOS | -10.95 | < 0.001 | HAR-RV significantly outperforms GARCH |
+| MSFT | LSTM WF vs GARCH OOS | -6.95 | < 0.001 | LSTM significantly outperforms GARCH |
+| MSFT | LSTM WF vs HAR-RV OOS | +8.67 | < 0.001 | HAR-RV significantly outperforms LSTM |
+| MSFT | HAR-RV OOS vs GARCH OOS | -7.95 | < 0.001 | HAR-RV significantly outperforms GARCH |
 
-where 
-𝑑
-𝑡
-=
-𝐿
-(
-𝑒
-𝐴
-,
-𝑡
-)
-−
-𝐿
-(
-𝑒
-𝐵
-,
-𝑡
-)
-d
-t
-    ​
+---
 
-=L(e
-A,t
-    ​
+##  Future Work
+- Extend models to include **EGARCH** and **GJR-GARCH** (asymmetric volatility)  
+- Combine HAR and LSTM architectures for hybrid modeling  
+- Apply framework across asset classes (FX, bonds, crypto)  
+- Integrate forecasts into **option pricing** and **risk management** workflows  
 
-)−L(e
-B,t
-    ​
+---
 
-) and 
-𝐿
-L is squared error loss.
-A significant negative statistic implies model A is more accurate.
-
-### Sample Results (2018-2025)
-
-Ticker    Model    RMSE    MAE    MAPE (%)    R²
-AAPL    GARCH(1,1) (in-sample)    0.0583    0.0438    17.88    0.81
-AAPL    LSTM (WF)    0.0345    0.0238    8.79    0.94
-AAPL    HAR-RV (WF)    0.0212    0.0113    4.12    0.98
-MSFT    GARCH(1,1) (in-sample)    0.0538    0.0398    17.34    0.82
-MSFT    LSTM (WF)    0.0344    0.0229    9.56    0.93
-MSFT    HAR-RV (WF)    0.0188    0.0102    4.01    0.98
-
-Key takeaway:
-Both LSTM and HAR-RV models achieve significant accuracy improvements over GARCH baselines, reducing RMSE by over 50% and explaining 93–98% of realized volatility variance.
-
-### Diebold-Mariano Tests Results ( Forecast Accuracy Comparison)
-
-Ticker    Comparison    DM Stat    p-value    Interpretation
-AAPL    LSTM WF vs GARCH OOS    -9.54    < 0.001    LSTM significantly outperforms GARCH
-AAPL    LSTM WF vs HAR-RV OOS    +12.13    < 0.001    HAR-RV significantly outperforms LSTM
-AAPL    HAR-RV OOS vs GARCH OOS    -10.95    < 0.001    HAR-RV significantly outperforms GARCH
-MSFT    LSTM WF vs GARCH OOS    -6.95    < 0.001    LSTM significantly outperforms GARCH
-MSFT    LSTM WF vs HAR-RV OOS    +8.67    < 0.001    HAR-RV significantly outperforms LSTM
-MSFT    HAR-RV OOS vs GARCH OOS    -7.95    < 0.001    HAR-RV significantly outperforms GARCH
-
-### License
-
-MIT License © Kevin Wood
-
+## 📜 License
+**MIT License © Kevin Wood**
